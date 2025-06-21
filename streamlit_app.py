@@ -1,10 +1,8 @@
 # streamlit_app.py
 import streamlit as st
 import requests
-import json
-from typing import List
 
-# Page configuration
+# --- STREAMLIT PAGE SETUP ---
 st.set_page_config(
     page_title="Doki - Chat with RamanSpy Docs",
     page_icon="🔬",
@@ -40,14 +38,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state for chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
 # Header
 st.markdown('<h1 class="main-header">🔬 Doki - Chat with RamanSpy Documentation</h1>', unsafe_allow_html=True)
 
-# Sidebar with information
+# --- API Configuration ---
+API_URL = "http://127.0.0.1:8000/chat"
+
+# Sidebar with information and API status
 with st.sidebar:
     st.header("ℹ️ About")
     st.markdown("""
@@ -75,45 +72,41 @@ with st.sidebar:
 # Main chat interface
 st.header("💬 Chat with RamanSpy Docs")
 
+# Initialize session state for chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 # Display chat messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # Chat input
-if prompt := st.chat_input("Ask a question about RamanSpy..."):
+if user_question := st.chat_input("Ask a question about RamanSpy..."):
     # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.messages.append({"role": "user", "content": user_question})
     
     # Display user message
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(user_question)
     
-    # Display assistant response
+    # Display assistant response with spinner
     with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        
-        try:
-            # Make API request
-            response = requests.post(
-                "http://localhost:8000/chat",
-                json={"question": prompt},
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                answer = response.json()["answer"]
-                message_placeholder.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-            else:
-                error_msg = f"API Error: {response.status_code} - {response.text}"
-                message_placeholder.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        with st.spinner("Thinking..."):
+            try:
+                response = requests.post(API_URL, json={"question": user_question}, timeout=30)
+                response.raise_for_status()  # Better error handling
                 
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Connection Error: {str(e)}"
-            message_placeholder.error(error_msg)
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                api_response = response.json()
+                answer = api_response.get("answer", "Sorry, I couldn't get a valid answer from the server.")
+                
+                st.markdown(answer)
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                
+            except requests.exceptions.RequestException as e:
+                error_msg = f"An error occurred while connecting to the backend API: {e}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
 # Clear chat button
 if st.button("🗑️ Clear Chat History"):
