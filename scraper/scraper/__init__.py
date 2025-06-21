@@ -1,0 +1,1 @@
+# This file makes the nested scraper directory a Python package 
