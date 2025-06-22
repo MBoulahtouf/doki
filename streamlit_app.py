@@ -54,6 +54,7 @@ with st.sidebar:
     - Ask questions about RamanSpy
     - Get answers from the documentation
     - Powered by vector search and LLM
+    - **History-aware** - Follow-up questions work!
     
     **API Status:** Check if the backend is running
     """)
@@ -94,7 +95,23 @@ if user_question := st.chat_input("Ask a question about RamanSpy..."):
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             try:
-                response = requests.post(API_URL, json={"question": user_question}, timeout=30)
+                # Prepare chat history for the API
+                chat_history = []
+                for msg in st.session_state.messages[:-1]:  # Exclude the current question
+                    if msg["role"] == "user":
+                        chat_history.append({"role": "human", "content": msg["content"]})
+                    elif msg["role"] == "assistant":
+                        chat_history.append({"role": "ai", "content": msg["content"]})
+                
+                # Make API request with chat history
+                response = requests.post(
+                    API_URL, 
+                    json={
+                        "question": user_question,
+                        "chat_history": chat_history
+                    }, 
+                    timeout=30
+                )
                 response.raise_for_status()  # Better error handling
                 
                 api_response = response.json()
